@@ -6,12 +6,11 @@ import org.apache.kafka.common.serialization.Deserializer
 
 import scala.concurrent.duration.FiniteDuration
 
-case class ConsumerSettings[K, V](pollInterval: FiniteDuration, properties: Map[String, String] = Map.empty)
+case class ConsumerSettings[K, V](properties: Map[String, String] = Map.empty)
   (implicit val keyDeserializer: Deserializer[K], val valueDeserializer: Deserializer[V]) {
   def withBootstrapServers(bootstrapServers: String) = withProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
   def withAutoCommit(autoCommit: Boolean) = withProperty(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, autoCommit.toString)
   def withGroupId(groupId: String) = withProperty(ConsumerConfig.GROUP_ID_CONFIG, groupId)
-  def withPollInterval(interval: FiniteDuration) = copy[K, V](pollInterval = interval)
   def withMaxPollRecords(maxPollRecords: Long) = withProperty(ConsumerConfig.MAX_POLL_RECORDS_CONFIG, maxPollRecords.toString)
   def withAutoOffsetReset(reset: String) = withProperty(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, reset)
   def withClientId(clientId: String) = withProperty(ConsumerConfig.CLIENT_ID_CONFIG, clientId)
