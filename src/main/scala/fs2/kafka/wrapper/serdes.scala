@@ -8,9 +8,9 @@ import org.apache.kafka.common.serialization._
 trait DefaultSerializers {
   implicit val byteArraySerializer: Serializer[Array[Byte]] = new ByteArraySerializer()
   implicit val stringSerializer: Serializer[String] = new StringSerializer()
-  implicit val longSerializer: Serializer[Long] = wrap(new LongSerializer(), Long.box)
-  implicit val intSerializer: Serializer[Int] = wrap(new IntegerSerializer, Int.box)
-  implicit val doubleSerializer: Serializer[Double] = wrap(new DoubleSerializer, Double.box)
+  implicit val longSerializer: Serializer[Long] = wrap(new LongSerializer(), long2Long)
+  implicit val intSerializer: Serializer[Int] = wrap(new IntegerSerializer, int2Integer)
+  implicit val doubleSerializer: Serializer[Double] = wrap(new DoubleSerializer, double2Double)
 
   private def wrap[T, U](underlying: Serializer[U], fn: T => U) = new Serializer[T] {
     override def serialize(topic: String, data: T) =
@@ -27,9 +27,9 @@ trait DefaultSerializers {
 trait DefaultDeserializers {
   implicit val byteArrayDeserializer: Deserializer[Array[Byte]] = new ByteArrayDeserializer()
   implicit val stringDeserializer: Deserializer[String] = new StringDeserializer()
-  implicit val longDeserializer: Deserializer[Long] = wrap(new LongDeserializer(), Long.unbox)
-  implicit val intDeserializer: Deserializer[Int] = wrap(new IntegerDeserializer, Int.unbox)
-  implicit val doubleDeserializer: Deserializer[Double] = wrap(new DoubleDeserializer, Double.unbox)
+  implicit val longDeserializer: Deserializer[Long] = wrap(new LongDeserializer(), Long2long)
+  implicit val intDeserializer: Deserializer[Int] = wrap(new IntegerDeserializer, Integer2int)
+  implicit val doubleDeserializer: Deserializer[Double] = wrap(new DoubleDeserializer, Double2double)
 
   private def wrap[T, U](underlying: Deserializer[U], fn: U => T) = new Deserializer[T] {
     override def configure(configs: JMap[String, _], isKey: Boolean) =
