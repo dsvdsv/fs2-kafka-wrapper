@@ -14,7 +14,7 @@ import scala.collection.JavaConverters._
 trait ConsumerHandler[F[_], K, V] {
   def assignment(): F[Set[TopicPartition]]
   def subscription(): F[Set[String]]
-  def subscribe(topics: Seq[String])
+  def subscribe(topics: Seq[String]): F[Unit]
   def subscribe(topics: Seq[String], onRevoked: Seq[TopicPartition] => Unit, onAssigned: Seq[TopicPartition] => Unit): F[Unit]
   def unsubscribe(): F[Unit]
   def assign(partition: Seq[TopicPartition]): F[Unit]
@@ -57,9 +57,9 @@ object ConsumerHandler {
 
       override def subscribe(topics: Seq[String], onRevoked: Seq[TopicPartition] => Unit, onAssigned: Seq[TopicPartition] => Unit) = F.delay {
         consumer.subscribe(topics.asJava, new ConsumerRebalanceListener {
-          override def onPartitionsRevoked(partitions: JCollection[TopicPartition]) = onRevoked(partitions.asScala)
+          override def onPartitionsRevoked(partitions: JCollection[TopicPartition]) = onRevoked(partitions.asScala.toSeq)
 
-          override def onPartitionsAssigned(partitions: JCollection[TopicPartition]) = onAssigned(partitions.asScala)
+          override def onPartitionsAssigned(partitions: JCollection[TopicPartition]) = onAssigned(partitions.asScala.toSeq)
         })
       }
 

@@ -4,8 +4,6 @@ import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.Deserializer
 
-import scala.concurrent.duration.FiniteDuration
-
 case class ConsumerSettings[K, V](properties: Map[String, String] = Map.empty)
   (implicit val keyDeserializer: Deserializer[K], val valueDeserializer: Deserializer[V]) {
   def withBootstrapServers(bootstrapServers: String) = withProperty(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers)
