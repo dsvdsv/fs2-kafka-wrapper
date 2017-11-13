@@ -6,7 +6,6 @@ import java.util
 import fs2.{Strategy, Task}
 import org.apache.kafka.clients.consumer.{Consumer, ConsumerRecord, MockConsumer, OffsetResetStrategy}
 import org.apache.kafka.common.TopicPartition
-import org.apache.kafka.common.record.TimestampType
 import org.scalatest.FunSpec
 
 import scala.concurrent.duration._
