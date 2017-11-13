@@ -24,7 +24,7 @@ class KafkaConsumerTest extends FunSpec {
     beginningOffsets.put(new TopicPartition("test", 1), long2Long(0L))
     mockConsumer.updateBeginningOffsets(beginningOffsets)
 
-    val record = new ConsumerRecord("test", 0, 0, 0L, TimestampType.CREATE_TIME, 0L, 0, 0, "key1", "value1")
+    val record = new ConsumerRecord("test", 0, 0, "key1", "value1")
 
     mockConsumer.schedulePollTask(() => {
       mockConsumer.rebalance(util.Arrays.asList(new TopicPartition("test", 0), new TopicPartition("test", 1)))
