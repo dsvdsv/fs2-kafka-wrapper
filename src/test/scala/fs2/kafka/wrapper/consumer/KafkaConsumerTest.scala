@@ -1,42 +1,52 @@
 package fs2.kafka.wrapper.consumer
 
-
-import java.util
-
 import fs2.{Strategy, Task}
 import org.apache.kafka.clients.consumer.{Consumer, ConsumerRecord, MockConsumer, OffsetResetStrategy}
 import org.apache.kafka.common.TopicPartition
-import org.scalatest.FunSpec
+import org.scalatest.{FunSpec, Matchers}
 
-import scala.concurrent.duration._
 import scala.collection.JavaConverters._
+import scala.concurrent.duration._
 
-class KafkaConsumerTest extends FunSpec {
+class KafkaConsumerTest extends FunSpec with Matchers {
 
   implicit val S: Strategy = Strategy.fromCachedDaemonPool()
 
-  it("smoke test") {
-    val mockConsumer = new MockConsumer[String, String](OffsetResetStrategy.EARLIEST)
-
-    val beginningOffsets = new util.HashMap[TopicPartition, java.lang.Long]
-    beginningOffsets.put(new TopicPartition("test", 0), long2Long(0L))
-    beginningOffsets.put(new TopicPartition("test", 1), long2Long(0L))
-    mockConsumer.updateBeginningOffsets(beginningOffsets)
-
-    val record = new ConsumerRecord("test", 0, 0, "key1", "value1")
+  it("subscribe and poll") {
+    val mockConsumer = mkMockConsumer("test", 2)
 
     mockConsumer.schedulePollTask(() => {
-      mockConsumer.rebalance(util.Arrays.asList(new TopicPartition("test", 0), new TopicPartition("test", 1)))
-      mockConsumer.addRecord(record)
+      genMessages("test", 0).foreach(mockConsumer.addRecord)
     })
 
-    val c:Task[Consumer[String, String]] = Task.delay(mockConsumer)
-    val s = KafkaConsumer(c).flatMap { client =>
-        client.subscribe(Seq("test"), 1.second)
-      }
+    val c: Task[Consumer[String, String]] = Task.delay(mockConsumer)
 
-    val records = s.head.runLast.unsafeRun()
+    val messages =
+      KafkaConsumer(c).flatMap { _.subscribe(Seq("test"), 1.second) }
+        .take(2) // rebalance + messages
+        .runLast.unsafeRun()
 
-    assert(records.map(_.iterator().asScala.toSeq) == Some(Seq(record)))
+    messages.get.count() shouldBe 10
+  }
+
+  def genMessages(topic: String, partition: Int) = {
+    (0 until 10)
+      .map(idx => new ConsumerRecord(topic, partition, idx, s"key$idx", s"value$idx"))
+  }
+
+  def mkMockConsumer(topic: String, partitions: Int): MockConsumer[String, String] = {
+    val mockConsumer = new MockConsumer[String, String](OffsetResetStrategy.EARLIEST)
+
+    mockConsumer.updateBeginningOffsets((0 until partitions)
+      .map(idx => new TopicPartition(topic, idx) -> long2Long(idx))
+      .toMap
+      .asJava
+    )
+
+    mockConsumer.schedulePollTask(() => {
+      mockConsumer.rebalance((0 until 2).map(idx => new TopicPartition(topic, idx)).toList.asJava)
+    })
+
+    mockConsumer
   }
 }
