@@ -29,6 +29,31 @@ class KafkaConsumerTest extends FunSpec with Matchers {
     messages.get.count() shouldBe 10
   }
 
+  it("resubscribe should terminate previous subscription") {
+    val mockConsumer = mkMockConsumer("test", 1)
+
+    mockConsumer.schedulePollTask(() => {
+      genMessages("test", 0).foreach(mockConsumer.addRecord)
+
+      mockConsumer.schedulePollTask(() => {
+        genMessages("test", 0).foreach(mockConsumer.addRecord)
+      })
+    })
+
+    val c: Task[Consumer[String, String]] = Task.delay(mockConsumer)
+
+    val messages = KafkaConsumer(c).flatMap { client =>
+      val first = client.subscribe(Seq("test"), 1.second)
+      val second = client.subscribe(Seq("test"), 1.second)
+
+      second.take(4)
+    }
+      .runLast.unsafeRun()
+
+    messages.get.count() shouldBe 10
+
+  }
+
   def genMessages(topic: String, partition: Int) = {
     (0 until 10)
       .map(idx => new ConsumerRecord(topic, partition, idx, s"key$idx", s"value$idx"))
@@ -39,12 +64,11 @@ class KafkaConsumerTest extends FunSpec with Matchers {
 
     mockConsumer.updateBeginningOffsets((0 until partitions)
       .map(idx => new TopicPartition(topic, idx) -> long2Long(idx))
-      .toMap
-      .asJava
+      .toMap.asJava
     )
 
     mockConsumer.schedulePollTask(() => {
-      mockConsumer.rebalance((0 until 2).map(idx => new TopicPartition(topic, idx)).toList.asJava)
+      mockConsumer.rebalance((0 until partitions).map(idx => new TopicPartition(topic, idx)).toList.asJava)
     })
 
     mockConsumer
