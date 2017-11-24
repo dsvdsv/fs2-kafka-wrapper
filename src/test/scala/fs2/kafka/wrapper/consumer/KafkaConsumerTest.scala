@@ -46,7 +46,7 @@ class KafkaConsumerTest extends FunSpec with Matchers {
       val first = client.subscribe(Seq("test"), 1.second)
       val second = client.subscribe(Seq("test"), 1.second)
 
-      second.take(4)
+      first.take(1) ++ second.take(1)
     }
       .runLast.unsafeRun()
 
