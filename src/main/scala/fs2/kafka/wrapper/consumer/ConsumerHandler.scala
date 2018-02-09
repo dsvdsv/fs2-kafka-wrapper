@@ -3,12 +3,12 @@ package fs2.kafka.wrapper.consumer
 import java.util.concurrent.TimeUnit
 import java.util.{Collection => JCollection, Map => JMap}
 
-import fs2.util.Async
+import cats.effect.Async
 import org.apache.kafka.clients.consumer._
 import org.apache.kafka.common.{PartitionInfo, TopicPartition}
 
-import scala.concurrent.duration.FiniteDuration
 import scala.collection.JavaConverters._
+import scala.concurrent.duration.FiniteDuration
 
 
 trait ConsumerHandler[F[_], K, V] {
@@ -84,17 +84,15 @@ object ConsumerHandler {
       }
 
       override def commitAsync(offsets: Map[TopicPartition, OffsetAndMetadata]) = F.async { r =>
-        F.delay {
-          consumer.commitAsync(offsets.asJava, new OffsetCommitCallback {
-            override def onComplete(offsets: JMap[TopicPartition, OffsetAndMetadata], exception: Exception) = {
-              if (exception == null) {
-                r(Left(exception))
-              } else {
-                r(Right(offsets.asScala.toMap))
-              }
+        consumer.commitAsync(offsets.asJava, new OffsetCommitCallback {
+          override def onComplete(offsets: JMap[TopicPartition, OffsetAndMetadata], exception: Exception) = {
+            if (exception == null) {
+              r(Left(exception))
+            } else {
+              r(Right(offsets.asScala.toMap))
             }
-          })
-        }
+          }
+        })
       }
 
       def seek(partition: TopicPartition, offset: Long) = F.delay {

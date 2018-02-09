@@ -4,7 +4,7 @@ lazy val `fs2-kafka-wrapper` = (project in file("."))
   .settings(
     name := "fs2-kafka-wrapper",
     version      := "0.1.0-SNAPSHOT",
-    scalaVersion := "2.12.3",
+    scalaVersion := "2.12.4",
 
     scalacOptions ++= Seq(
       "-feature",
