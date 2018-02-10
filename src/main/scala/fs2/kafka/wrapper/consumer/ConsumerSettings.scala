@@ -1,7 +1,6 @@
 package fs2.kafka.wrapper.consumer
 
 import org.apache.kafka.clients.consumer.ConsumerConfig
-import org.apache.kafka.common.TopicPartition
 import org.apache.kafka.common.serialization.Deserializer
 
 case class ConsumerSettings[K, V](properties: Map[String, String] = Map.empty)
@@ -15,22 +14,4 @@ case class ConsumerSettings[K, V](properties: Map[String, String] = Map.empty)
 
   def withProperty(key: String, value: String) = copy[K, V](properties = properties.updated(key, value))
 
-}
-
-sealed trait Subscription
-sealed trait AutoSubscription extends Subscription
-sealed trait ManualSubscription extends Subscription
-
-object Subscriptions {
-
-  private[wrapper] final case class TopicsSubscription(topics: Set[String]) extends AutoSubscription
-  private[wrapper] final case class TopicsPatternSubscription(pattern: String) extends AutoSubscription
-  private[wrapper] final case class ManualAssignment(assignments: Set[TopicPartition]) extends ManualSubscription
-  private[wrapper] final case class ManualAssignmentWithOffsets(assignmentsAndOffsets: Map[TopicPartition, Long]) extends ManualSubscription
-
-  def topics(topics: Set[String]) = TopicsSubscription(topics)
-  def topics(topics: String*) = TopicsSubscription(topics.toSet)
-  def topicPattern(pattern: String) = TopicsPatternSubscription(pattern)
-  def assignment(topicPartitions: Set[TopicPartition]) = ManualAssignment(topicPartitions)
-  def assignmentWithOffsets(partitionsAndOffsets: Map[TopicPartition, Long]) = ManualAssignmentWithOffsets(partitionsAndOffsets)
 }

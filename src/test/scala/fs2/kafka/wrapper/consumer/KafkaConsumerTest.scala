@@ -1,7 +1,7 @@
 package fs2.kafka.wrapper.consumer
 
-import fs2.{Strategy, Task}
-import org.apache.kafka.clients.consumer.{Consumer, ConsumerRecord, MockConsumer, OffsetResetStrategy}
+import cats.effect.IO
+import org.apache.kafka.clients.consumer.{ ConsumerRecord, MockConsumer, OffsetResetStrategy}
 import org.apache.kafka.common.TopicPartition
 import org.scalatest.{FunSpec, Matchers}
 
@@ -10,8 +10,6 @@ import scala.concurrent.duration._
 
 class KafkaConsumerTest extends FunSpec with Matchers {
 
-  implicit val S: Strategy = Strategy.fromCachedDaemonPool()
-
   it("subscribe and poll") {
     val mockConsumer = mkMockConsumer("test", 2)
 
@@ -19,39 +17,12 @@ class KafkaConsumerTest extends FunSpec with Matchers {
       genMessages("test", 0).foreach(mockConsumer.addRecord)
     })
 
-    val c: Task[Consumer[String, String]] = Task.delay(mockConsumer)
-
     val messages =
-      KafkaConsumer(c).flatMap { _.subscribe(Seq("test"), 1.second) }
-        .take(2) // rebalance + messages
-        .runLast.unsafeRun()
+      Consumer.mkConsumer[IO, String, String](mockConsumer).through(Consumer.subscribeStream(Seq("test"), 1.second))
+        .take(10) // rebalance + messages
+        .compile.toVector.unsafeRunSync()
 
-    messages.get.count() shouldBe 10
-  }
-
-  it("resubscribe should terminate previous subscription") {
-    val mockConsumer = mkMockConsumer("test", 1)
-
-    mockConsumer.schedulePollTask(() => {
-      genMessages("test", 0).foreach(mockConsumer.addRecord)
-
-      mockConsumer.schedulePollTask(() => {
-        genMessages("test", 0).foreach(mockConsumer.addRecord)
-      })
-    })
-
-    val c: Task[Consumer[String, String]] = Task.delay(mockConsumer)
-
-    val messages = KafkaConsumer(c).flatMap { client =>
-      val first = client.subscribe(Seq("test"), 1.second)
-      val second = client.subscribe(Seq("test"), 1.second)
-
-      first.take(1) ++ second.take(1)
-    }
-      .runLast.unsafeRun()
-
-    messages.get.count() shouldBe 10
-
+    messages.length shouldBe 10
   }
 
   def genMessages(topic: String, partition: Int) = {

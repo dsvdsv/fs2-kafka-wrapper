@@ -8,17 +8,17 @@ import org.apache.kafka.clients.consumer._
 import org.apache.kafka.common.{PartitionInfo, TopicPartition}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.Duration
 
 
-trait ConsumerHandler[F[_], K, V] {
+trait ConsumerHadler[F[_], K, V] {
   def assignment(): F[Set[TopicPartition]]
   def subscription(): F[Set[String]]
   def subscribe(topics: Seq[String]): F[Unit]
   def subscribe(topics: Seq[String], onRevoked: Seq[TopicPartition] => Unit, onAssigned: Seq[TopicPartition] => Unit): F[Unit]
   def unsubscribe(): F[Unit]
   def assign(partition: Seq[TopicPartition]): F[Unit]
-  def poll(timeout: FiniteDuration): F[ConsumerRecords[K, V]]
+  def poll(timeout: Duration): F[Seq[ConsumerRecord[K, V]]]
   def commitSync(): F[Unit]
   def commitSync(offsets: Map[TopicPartition, OffsetAndMetadata]): F[Unit]
   def commitAsync(offsets: Map[TopicPartition, OffsetAndMetadata]): F[Map[TopicPartition, OffsetAndMetadata]]
@@ -35,28 +35,28 @@ trait ConsumerHandler[F[_], K, V] {
   def beginningOffsets(partitions: Seq[TopicPartition]): F[Map[TopicPartition, Long]]
   def endOffsets(partitions: Seq[TopicPartition]): F[Map[TopicPartition, Long]]
   def close(): F[Unit]
-  def close(timeout: FiniteDuration): F[Unit]
+  def close(timeout: Duration): F[Unit]
   def wakeup(): F[Unit]
 }
 
 
-object ConsumerHandler {
-  def fromConsumer[F[_], K, V](consumer: Consumer[K, V])(implicit F: Async[F]): ConsumerHandler[F, K, V] = {
-    new ConsumerHandler[F, K, V] {
+object ConsumerHadler {
+  def fromConsumer[F[_], K, V](underline: Consumer[K, V])(implicit F: Async[F]): ConsumerHadler[F, K, V] = {
+    new ConsumerHadler[F, K, V] {
       override def assignment() = F.delay {
-        consumer.assignment().asScala.toSet
+        underline.assignment().asScala.toSet
       }
 
       override def subscription() = F.delay {
-        consumer.subscription().asScala.toSet
+        underline.subscription().asScala.toSet
       }
 
       override def subscribe(topics: Seq[String]) = F.delay {
-        consumer.subscribe(topics.asJava)
+        underline.subscribe(topics.asJava)
       }
 
       override def subscribe(topics: Seq[String], onRevoked: Seq[TopicPartition] => Unit, onAssigned: Seq[TopicPartition] => Unit) = F.delay {
-        consumer.subscribe(topics.asJava, new ConsumerRebalanceListener {
+        underline.subscribe(topics.asJava, new ConsumerRebalanceListener {
           override def onPartitionsRevoked(partitions: JCollection[TopicPartition]) = onRevoked(partitions.asScala.toSeq)
 
           override def onPartitionsAssigned(partitions: JCollection[TopicPartition]) = onAssigned(partitions.asScala.toSeq)
@@ -64,27 +64,27 @@ object ConsumerHandler {
       }
 
       override def unsubscribe() = F.delay {
-        consumer.unsubscribe()
+        underline.unsubscribe()
       }
 
       override def assign(partition: Seq[TopicPartition]) = F.delay {
-        consumer.assign(partition.asJava)
+        underline.assign(partition.asJava)
       }
 
-      override def poll(timeout: FiniteDuration) = F.delay {
-        consumer.poll(timeout.toMillis)
+      override def poll(timeout: Duration) = F.delay {
+        underline.poll(timeout.toMillis).asScala.toSeq
       }
 
       override def commitSync() = F.delay {
-        consumer.commitSync()
+        underline.commitSync()
       }
 
       override def commitSync(offsets: Map[TopicPartition, OffsetAndMetadata]) = F.delay {
-        consumer.commitSync(offsets.asJava)
+        underline.commitSync(offsets.asJava)
       }
 
       override def commitAsync(offsets: Map[TopicPartition, OffsetAndMetadata]) = F.async { r =>
-        consumer.commitAsync(offsets.asJava, new OffsetCommitCallback {
+        underline.commitAsync(offsets.asJava, new OffsetCommitCallback {
           override def onComplete(offsets: JMap[TopicPartition, OffsetAndMetadata], exception: Exception) = {
             if (exception == null) {
               r(Left(exception))
@@ -96,51 +96,51 @@ object ConsumerHandler {
       }
 
       def seek(partition: TopicPartition, offset: Long) = F.delay {
-        consumer.seek(partition, offset)
+        underline.seek(partition, offset)
       }
 
       def seekToBeginning(partitions: Seq[TopicPartition]) = F.delay {
-        consumer.seekToBeginning(partitions.asJava)
+        underline.seekToBeginning(partitions.asJava)
       }
 
       def seekToEnd(partitions: Seq[TopicPartition]) = F.delay {
-        consumer.seekToEnd(partitions.asJava)
+        underline.seekToEnd(partitions.asJava)
       }
 
       def position(partition: TopicPartition) = F.delay {
-        consumer.position(partition)
+        underline.position(partition)
       }
 
       def committed(partition: TopicPartition) = F.delay {
-        consumer.committed(partition)
+        underline.committed(partition)
       }
 
       def partitionsFor(topic: String) = F.delay {
-        consumer.partitionsFor(topic).asScala
+        underline.partitionsFor(topic).asScala
       }
 
       def listTopics() = F.delay {
-        consumer.listTopics().asScala
+        underline.listTopics().asScala
           .mapValues(_.asScala.toSeq)
           .toMap
       }
 
       override def pause(partitions: Seq[TopicPartition]) = F.delay {
-        consumer.pause(partitions.asJava)
+        underline.pause(partitions.asJava)
       }
 
       override def resume(partitions: Seq[TopicPartition]) = F.delay {
-        consumer.resume(partitions.asJava)
+        underline.resume(partitions.asJava)
       }
 
       def offsetsForTimes(timestampsToSearch: Map[TopicPartition, Long]) = F.delay {
-        consumer
+        underline
           .offsetsForTimes(timestampsToSearch.mapValues(long2Long).asJava)
           .asScala.toMap
       }
 
       def beginningOffsets(partitions: Seq[TopicPartition]) = F.delay {
-        consumer
+        underline
           .beginningOffsets(partitions.asJava)
           .asScala
           .toMap
@@ -148,7 +148,7 @@ object ConsumerHandler {
       }
 
       def endOffsets(partitions: Seq[TopicPartition]) = F.delay {
-        consumer
+        underline
           .endOffsets(partitions.asJava)
           .asScala
           .toMap
@@ -156,15 +156,15 @@ object ConsumerHandler {
       }
 
       override def close() = F.delay {
-        consumer.close()
+        underline.close()
       }
 
-      def close(timeout: FiniteDuration) = F.delay {
-        consumer.close(timeout.toMillis, TimeUnit.MILLISECONDS)
+      def close(timeout: Duration) = F.delay {
+        underline.close(timeout.toMillis, TimeUnit.MILLISECONDS)
       }
 
       override def wakeup() = F.delay {
-        consumer.wakeup()
+        underline.wakeup()
       }
     }
   }
